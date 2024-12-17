@@ -3,35 +3,42 @@ import nltk
 import pandas as pd
 from collections import Counter
 from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 import logging
 
-# Скачиваем необходимые ресурсы из NLTK
-nltk.download('stopwords')
-nltk.download('punkt_tab')
-nltk.download('gutenberg')
+# Инициализация лемматизатора и загрузка необходимых данных
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.info("Начало загрузки пакетов NLTK...")
 
+nltk.download('punkt')
+logging.info("Пакет punkt загружен.")
+nltk.download('stopwords')
+logging.info("Пакет stopwords загружен.")
+nltk.download('wordnet')
+logging.info("Пакет wordnet загружен.")
+
+lemmatizer = WordNetLemmatizer()
 from nltk.corpus import gutenberg
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def extract_keywords(text, top_n=10):
     """Извлекает топ-N популярных слов из текста, исключая стоп-слова и знаки препинания"""
     # Токенизация текста: делим на слова
     words = word_tokenize(text.lower())  # Приводим к нижнему регистру
 
-    # Убираем знаки препинания
-    words = [word for word in words if word.isalpha()]
-
-    # Загружаем список стоп-слов
+    # Убираем знаки препинания и фильтруем стоп-слова
     stop_words = set(stopwords.words("english"))
+    words = [word for word in words if word.isalpha() and word not in stop_words]
 
-    # Отфильтровываем стоп-слова
-    filtered_words = [word for word in words if word not in stop_words]
+    # Лемматизация слов
+    lemmatized_words = [lemmatizer.lemmatize(word) for word in words]
 
     # Подсчитываем частоту слов
-    word_counts = Counter(filtered_words)
+    word_counts = Counter(lemmatized_words)
 
     # Получаем топ-N самых популярных слов
     most_common_words = word_counts.most_common(top_n)
@@ -39,16 +46,20 @@ def extract_keywords(text, top_n=10):
     # Возвращаем список популярных слов
     return most_common_words
 
+
+
 def download_texts():
     """
     Загружает тексты из корпуса NLTK 'gutenberg' и сохраняет их в директорию 'data/text' с именем файла.
     """
+    logging.info("Начало загрузки текстов из корпуса Gutenberg.")
     # Проверяем, существует ли директория для хранения текстов, если нет — создаем
     os.makedirs("data/text", exist_ok=True)
 
     # Перебираем все файлы в корпусе gutenberg
     for file_id in gutenberg.fileids():
         try:
+            logging.info(f"Загрузка текста {file_id}.")
             # Считываем текст из файла корпуса
             text = gutenberg.raw(file_id)
 
@@ -62,12 +73,15 @@ def download_texts():
 
     logging.info("Все тексты успешно сохранены в data/text.")
 
+
 def analyze_texts():
     """
     Читает все тексты из директории 'data/text', анализирует их и сохраняет результаты в файл 'results/data_analysis.xlsx'.
     Для каждого текста собираются параметры: количество символов, количество символов без пробелов, количество слов и количество строк.
     Также рассчитывается заспамленность и количество ключевых слов.
     """
+    logging.info("Начало анализа текстов.")
+
     def analyze_text(text):
         """
         Функция для анализа текста. Возвращает словарь с параметрами текста.
@@ -93,6 +107,7 @@ def analyze_texts():
     # Перебираем все файлы с текстами
     for file in text_files:
         try:
+            logging.info(f"Анализ текста {file}.")
             with open(f"data/text/{file}", "r", encoding="utf-8") as f:
                 text = f.read()
 
@@ -117,8 +132,11 @@ def analyze_texts():
     df.to_excel("results/data_analysis.xlsx", index=False)
     logging.info("Анализ завершён. Результаты сохранены в results/data_analysis.xlsx.")
 
+
 def filter_texts():
     """Фильтрует тексты на основе анализа и добавляет аннотацию и ключевые слова в отфильтрованные файлы"""
+    logging.info("Начало фильтрации текстов.")
+
     # Проверка существования Excel файла с результатами анализа
     if not os.path.exists("results/data_analysis.xlsx"):
         logging.error("Файл с результатами анализа не найден!")
@@ -141,6 +159,7 @@ def filter_texts():
     os.makedirs("data/processed_texts", exist_ok=True)
     for file in filtered_df["file"]:
         try:
+            logging.info(f"Обработка файла {file}.")
             with open(f"data/text/{file}", "r", encoding="utf-8") as f:
                 content = f.read()
 
@@ -162,11 +181,15 @@ def filter_texts():
         except Exception as e:
             logging.error(f"Ошибка при обработке {file}: {e}")
 
+
 if __name__ == "__main__":
     # Запуск всех функций по очереди
     try:
+        logging.info("Запуск процесса загрузки текстов.")
         download_texts()  # Загрузка текстов из NLTK
+        logging.info("Запуск анализа текстов.")
         analyze_texts()  # Анализ текстов
+        logging.info("Запуск фильтрации текстов.")
         filter_texts()  # Фильтрация текстов
     except Exception as e:
         logging.error(f"Произошла ошибка: {e}")
